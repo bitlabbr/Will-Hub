@@ -24,6 +24,7 @@
 
         button { padding: 15px 30px; font-size: 1.5em; cursor: pointer; background: #e94560; color: white; border: none; border-radius: 8px; }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -35,15 +36,22 @@
 <audio id="bg-music" src="will-hub-loby-soundtrack.mp3" loop></audio>
 
 <div id="lobby-view">
-    <h2>Para jogar, acesse no celular:</h2>
-    <h3 style="color: #a2a8d3;">http://SEU_IP:3000/core/client</h3>
-    <div id="room-code-display">----</div>
+    <div style="display: flex; justify-content: center; align-items: center; gap: 50px; margin: 20px 0; background: rgba(0,0,0,0.3); padding: 30px; border-radius: 15px;">
+        <div style="text-align: left;">
+            <h2>Acesse no celular:</h2>
+            <h3 id="join-url" style="color: #a2a8d3; margin: 10px 0;">Calculando IP...</h3>
+            <h2 style="margin-top: 20px;">CÓDIGO DA SALA:</h2>
+            <div id="room-code-display" style="font-size: 5em; color: #e94560; letter-spacing: 10px; font-weight: bold; margin: 0;">----</div>
+        </div>
+
+        <div id="qrcode-container" style="background: white; padding: 15px; border-radius: 10px;"></div>
+    </div>
 
     <h3>Jogadores Conectados (<span id="player-count">0</span>)</h3>
     <ul id="players-list"></ul>
 
     <div class="games-catalog">
-        <div class="game-card" data-game-id="PoC">🕹️ Jogar Teste (Canvas)</div>
+        <div class="game-card" data-game-id="FrameGame">🃏 FrameGame</div>
     </div>
 </div>
 

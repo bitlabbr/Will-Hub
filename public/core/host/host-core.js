@@ -26,7 +26,25 @@ document.getElementById('start-btn').addEventListener('click', () => {
 });
 
 // --- GERENCIAMENTO DO LOBBY ---
-socket.on('roomCreated', (code) => { roomCodeDisplay.innerText = code; });
+socket.on('roomCreated', (data) => {
+    roomCodeDisplay.innerText = data.code;
+
+    // Monta a URL completa baseada no IP local
+    const clientUrl = `http://${data.ip}:3000/core/client`;
+    document.getElementById('join-url').innerText = clientUrl;
+
+    // Limpa a div e gera o QR Code apontando para a URL
+    const qrContainer = document.getElementById('qrcode-container');
+    qrContainer.innerHTML = '';
+    new QRCode(qrContainer, {
+        text: clientUrl,
+        width: 180,
+        height: 180,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.M
+    });
+});
 
 socket.on('playerJoined', (player) => {
     players[player.id] = player;
@@ -99,3 +117,9 @@ function loadGamePlugin(gameId) {
 window.endGameAndReturnToLobby = () => {
     socket.emit('returnToLobby');
 };
+
+// Permite que o jogo na TV envie comandos para os celulares e acesse os jogadores
+window.broadcastToClients = (actionType, payloadData = {}) => {
+    socket.emit('hostBroadcast', { type: actionType, payload: payloadData });
+};
+window.getConnectedPlayers = () => players;

@@ -1,3 +1,4 @@
+const os = require('os');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -23,6 +24,18 @@ function generateRoomCode() {
     return code;
 }
 
+function getLocalIP() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return 'localhost';
+}
+
 io.on('connection', (socket) => {
     console.log(`Dispositivo conectado: ${socket.id}`);
 
@@ -42,7 +55,7 @@ io.on('connection', (socket) => {
         };
 
         socket.join(roomCode);
-        socket.emit('roomCreated', roomCode);
+        socket.emit('roomCreated', { code: roomCode, ip: getLocalIP() });
     });
 
     socket.on('joinRoom', ({ roomCode, playerName }) => {
@@ -97,6 +110,12 @@ io.on('connection', (socket) => {
                 ...eventData
             });
         }
+    });
+
+    // A TV manda uma mensagem para todos os celulares da sala dela
+    socket.on('hostBroadcast', (eventData) => {
+        const roomCode = Object.keys(rooms).find(key => rooms[key].hostId === socket.id);
+        if (roomCode) io.to(roomCode).emit('hostGameEventToClient', eventData);
     });
 
     // ==========================

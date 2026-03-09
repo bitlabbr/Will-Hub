@@ -57,3 +57,9 @@ window.sendGameAction = (actionType, payloadData = {}) => {
         payload: payloadData
     });
 };
+
+// Ouve a TV e despacha para o script do jogo no celular
+socket.on('hostGameEventToClient', (data) => {
+    const event = new CustomEvent('HostActionEvent', { detail: data });
+    window.dispatchEvent(event);
+});
