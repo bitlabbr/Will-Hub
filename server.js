@@ -7,95 +7,119 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve os arquivos estáticos da pasta public
-app.use(express.static(path.join(__dirname, 'public')));
+// Roteamento de arquivos estáticos apontando para a nova estrutura
+app.use('/core', express.static(path.join(__dirname, 'public/core')));
+app.use('/games', express.static(path.join(__dirname, 'public/games')));
 
-// Objeto em memória para mapear { 'CODIGO_DA_SALA': 'socket_id_do_host' }
+// Rota raiz redireciona para o Hub do Host
+app.get('/', (req, res) => res.redirect('/core/host'));
+
 const rooms = {};
 
 function generateRoomCode() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let code = '';
-    for (let i = 0; i < 4; i++) {
-        code += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
+    for (let i = 0; i < 4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
     return code;
 }
 
 io.on('connection', (socket) => {
-    console.log(`Novo dispositivo conectado: ${socket.id}`);
+    console.log(`Dispositivo conectado: ${socket.id}`);
 
-    // --- HOST ---
+    // ===============
+    // LÓGICA DO CORE
+    // ==============
+
     socket.on('createRoom', () => {
         let roomCode;
-        // Garante que o código é único
-        do {
-            roomCode = generateRoomCode();
-        } while (rooms[roomCode]);
+        do { roomCode = generateRoomCode(); } while (rooms[roomCode]);
 
-        rooms[roomCode] = socket.id; // Atrela a sala ao Host
+        // Inicializa o estado complexo da sala
+        rooms[roomCode] = {
+            hostId: socket.id,
+            status: 'LOBBY',
+            players: {}
+        };
+
         socket.join(roomCode);
-        console.log(`Host ${socket.id} criou a sala ${roomCode}`);
-
         socket.emit('roomCreated', roomCode);
     });
 
-    // --- CLIENT ---
-    socket.on('joinRoom', (data) => {
-        const { roomCode, playerName } = data;
+    socket.on('joinRoom', ({ roomCode, playerName }) => {
         const code = roomCode.toUpperCase();
+        const room = rooms[code];
 
-        if (rooms[code]) {
+        if (room) {
             socket.join(code);
-            socket.roomId = code; // Salva o código da sala no socket do client
-            socket.playerName = playerName; // Salva o nome
+            socket.roomId = code;
 
-            console.log(`${playerName} entrou na sala ${code}`);
+            // Registra o jogador no estado da sala
+            room.players[socket.id] = { id: socket.id, name: playerName };
 
-            // Avisa APENAS o Host que um novo jogador entrou
-            io.to(rooms[code]).emit('playerJoined', { id: socket.id, name: playerName });
-
-            // Confirma para o Client que ele entrou com sucesso
-            socket.emit('joinSuccess');
+            // Avisa o Host e confirma para o Client
+            io.to(room.hostId).emit('playerJoined', room.players[socket.id]);
+            socket.emit('joinSuccess', { roomCode: code, status: room.status });
         } else {
-            socket.emit('joinError', 'Sala não encontrada. Verifique o código.');
+            socket.emit('joinError', 'Sala não encontrada.');
         }
     });
 
-    socket.on('playerAction', (actionData) => {
-        // Se o client está em uma sala válida, repassa a ação para o Host daquela sala
+    // ============
+    // DISPATCHER
+    // ===========
+
+    socket.on('launchGame', (gameId) => {
+        const roomCode = Object.keys(rooms).find(key => rooms[key].hostId === socket.id);
+        if (roomCode) {
+            rooms[roomCode].status = gameId; // Muda o estado da sala para o jogo escolhido
+            // Avisa todos na sala (Host e Clients) para carregarem os scripts desse jogo
+            io.to(roomCode).emit('gameLaunched', gameId);
+            console.log(`Sala ${roomCode} iniciou o jogo: ${gameId}`);
+        }
+    });
+
+    // O Host decide voltar para o Lobby Principal
+    socket.on('returnToLobby', () => {
+        const roomCode = Object.keys(rooms).find(key => rooms[key].hostId === socket.id);
+        if (roomCode) {
+            rooms[roomCode].status = 'LOBBY';
+            io.to(roomCode).emit('backToLobby');
+        }
+    });
+
+    // Payload esperado: { type: 'move_left', payload: { speed: 5 } }
+    socket.on('gameEvent', (eventData) => {
         if (socket.roomId && rooms[socket.roomId]) {
-            const hostId = rooms[socket.roomId];
-            io.to(hostId).emit('actionReceived', {
+            const hostId = rooms[socket.roomId].hostId;
+            // Repassa o evento para a TV embutindo quem foi o autor
+            io.to(hostId).emit('hostGameEvent', {
                 playerId: socket.id,
-                playerName: socket.playerName,
-                action: actionData
+                ...eventData
             });
         }
     });
 
-    // --- DESCONEXÃO ---
+    // ==========================
+    // CICLO DE VIDA E DESCONEXÃO
+    // =========================
     socket.on('disconnect', () => {
-        // 1. Verifica se quem desconectou foi um Host
-        const hostRoomCode = Object.keys(rooms).find(key => rooms[key] === socket.id);
+        // Verifica se era um Host
+        const hostRoomCode = Object.keys(rooms).find(key => rooms[key] && rooms[key].hostId === socket.id);
         if (hostRoomCode) {
-            console.log(`Host desconectado. Sala ${hostRoomCode} encerrada.`);
             delete rooms[hostRoomCode];
             return;
         }
 
-        // 2. Verifica se quem desconectou foi um Client (Celular)
+        // Verifica se era um Client
         if (socket.roomId && rooms[socket.roomId]) {
-            const hostId = rooms[socket.roomId];
-            console.log(`${socket.playerName} saiu da sala ${socket.roomId}`);
+            const room = rooms[socket.roomId];
+            const playerName = room.players[socket.id]?.name;
 
-            // Avisa a TV que este jogador específico saiu
-            io.to(hostId).emit('playerLeft', { playerId: socket.id, playerName: socket.playerName });
+            delete room.players[socket.id];
+            io.to(room.hostId).emit('playerLeft', { playerId: socket.id, playerName });
         }
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Servidor Hub rodando em http://localhost:${PORT}`));

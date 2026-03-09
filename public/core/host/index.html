@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Console Hub - TV</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #1a1a2e; color: white; text-align: center; margin: 0; overflow: hidden; }
+
+        /* Telas (Views) */
+        #start-screen { position: absolute; width: 100vw; height: 100vh; background: #16213e; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; }
+        #lobby-view { padding: 40px; display: none; }
+        #game-container { display: none; width: 100vw; height: 100vh; background: #0f3460; }
+
+        /* Estilos do Lobby */
+        #room-code-display { font-size: 5em; color: #e94560; letter-spacing: 10px; font-weight: bold; margin: 20px 0; }
+        #players-list { display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; list-style: none; padding: 0; }
+        .player-card { background: #0f3460; padding: 15px 30px; border-radius: 8px; font-size: 1.5em; }
+
+        /* Catálogo de Jogos */
+        .games-catalog { margin-top: 50px; display: flex; justify-content: center; gap: 20px; }
+        .game-card { background: #e94560; padding: 20px; border-radius: 10px; cursor: pointer; font-size: 1.5em; font-weight: bold; transition: transform 0.2s; }
+        .game-card:hover { transform: scale(1.1); }
+
+        button { padding: 15px 30px; font-size: 1.5em; cursor: pointer; background: #e94560; color: white; border: none; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+<div id="start-screen">
+    <h1>Seu Novo Console Web</h1>
+    <button id="start-btn">Ligar Console</button>
+</div>
+
+<audio id="bg-music" src="will-hub-loby-soundtrack.mp3" loop></audio>
+
+<div id="lobby-view">
+    <h2>Para jogar, acesse no celular:</h2>
+    <h3 style="color: #a2a8d3;">http://SEU_IP:3000/core/client</h3>
+    <div id="room-code-display">----</div>
+
+    <h3>Jogadores Conectados (<span id="player-count">0</span>)</h3>
+    <ul id="players-list"></ul>
+
+    <div class="games-catalog">
+        <div class="game-card" data-game-id="PoC">🕹️ Jogar Teste (Canvas)</div>
+    </div>
+</div>
+
+<div id="game-container"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="host-core.js"></script>
+</body>
+</html>
